@@ -29,8 +29,12 @@ const mongoose = require('mongoose');
 // Connect to MongoDB
 connectDB();
 
-const app = express();
 const port = 3005;
+const app = express();
+// Increase server timeout to 5 minutes (300,000 ms) to handle large file uploads
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+}).setTimeout(300000);
 
 // Session setup
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/revoice';
@@ -404,18 +408,19 @@ app.post('/api/init-transcription', isAuthenticated, upload.single('audio'), asy
         }
 
         // --- 1. Audio Preprocessing (Mandatory) ---
-        console.log('Preprocessing audio (16kHz, Mono, Denoise, Loudnorm)...');
-        const processedAudioPath = path.join(userDir, `processed_${path.basename(filePath, path.extname(filePath))}.wav`);
+        console.log('Preprocessing audio (MP3, 64k, Mono, Denoise, Loudnorm)...');
+        const processedAudioPath = path.join(userDir, `processed_${path.basename(filePath, path.extname(filePath))}.mp3`);
 
         await new Promise((resolve, reject) => {
             ffmpeg(filePath)
                 .audioChannels(1)
                 .audioFrequency(16000)
+                .audioBitrate('64k') // Use MP3 64k to reduce size (~0.5MB/min) while keeping quality for STT
                 .audioFilters([
                     'afftdn=nf=-25', // Light noise reduction
                     'loudnorm'       // Loudness normalization
                 ])
-                .toFormat('wav')     // Use WAV for lossless intermediate
+                .toFormat('mp3')     // Use MP3 for efficient size/duration ratio
                 .on('start', cmd => console.log('Preprocessing command:', cmd))
                 .on('end', () => {
                     console.log('Audio preprocessing complete.');
@@ -425,7 +430,6 @@ app.post('/api/init-transcription', isAuthenticated, upload.single('audio'), asy
                 .save(processedAudioPath);
         });
 
-        // Update finalAudioPath to point to the clean version for STT
         // Update finalAudioPath to point to the clean version for STT
         finalAudioPath = processedAudioPath;
 
