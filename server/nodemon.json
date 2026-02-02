@@ -1,0 +1,9 @@
+{
+    "ignore": [
+        "uploads/*",
+        "temp_dub/*",
+        "*.log",
+        "*.json"
+    ],
+    "ext": "js,mjs,json"
+}

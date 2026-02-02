@@ -1,0 +1,13 @@
+seperate audio from video: FFmpeg
+speech to text: Whisper (Groq)
+refine transcription: ChatGPT API (OpenAI)
+speaker diarization: Pyannote.audio
+translate text: Llama 3 (Groq)
+generate speech: ElevenLabs API
+dubbing logic: Python (MoviePy, FFmpeg)
+frontend: React, Vite, React Router, Axios
+backend: Node.js, Express, BullMQ, Redis
+database: SQLite, Sequelize, Mongoose (MongoDB)
+authentication: Passport.js (Local, Google OAuth), Bcrypt
+file handling: Multer
+rate limiting: Express Rate Limit

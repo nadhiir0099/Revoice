@@ -1,0 +1,10 @@
+numpy
+python-dotenv
+pydub
+aiohttp
+requests
+openai
+groq
+datasets
+rapidfuzz
+edge-tts

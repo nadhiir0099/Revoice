@@ -1,0 +1,105 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: revoice-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7
+    container_name: revoice-redis
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: revoice-api
+    ports:
+      - "3005:3005"
+    env_file:
+      - ./server/.env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/revoice
+      REDIS_HOST: redis
+      DIARIZATION_WORKER_URL: http://diarization-worker:8000
+    depends_on:
+      mongo:
+        condition: service_started
+      redis:
+        condition: service_started
+      diarization-worker:
+        condition: service_healthy
+    volumes:
+      - ./server/uploads:/app/uploads
+
+  worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: revoice-worker
+    env_file:
+      - ./server/.env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/revoice
+      REDIS_HOST: redis
+      DIARIZATION_WORKER_URL: http://diarization-worker:8000
+    command: [ "node", "workers/jobWorker.js" ]
+    depends_on:
+      mongo:
+        condition: service_started
+      redis:
+        condition: service_started
+      diarization-worker:
+        condition: service_healthy
+    volumes:
+      - ./server/uploads:/app/uploads
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3005
+    container_name: revoice-client
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+  diarization-worker:
+    build:
+      context: ./services/diarization-worker
+      dockerfile: Dockerfile
+    container_name: revoice-diarization-worker
+    env_file:
+      - ./server/.env
+    environment:
+      HF_TOKEN: ${HF_TOKEN}
+      HF_HOME: /app/.cache/huggingface
+      OMP_NUM_THREADS: 1
+      MKL_NUM_THREADS: 1
+    volumes:
+      - ./server/uploads:/app/uploads
+      - hf_cache:/app/.cache/huggingface
+      - ./server/voices_list_utf8.json:/app/voices_list.json:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          memory: 1G
+    healthcheck:
+      test: [ "CMD", "curl", "-s", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+volumes:
+  mongo_data:
+  hf_cache:
