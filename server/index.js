@@ -31,10 +31,6 @@ connectDB();
 
 const port = 3005;
 const app = express();
-// Increase server timeout to 5 minutes (300,000 ms) to handle large file uploads
-app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-}).setTimeout(300000);
 
 // Session setup
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/revoice';
@@ -912,4 +908,4 @@ setTimeout(cleanupOldFiles, 5000);
 
 app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
-});
+}).setTimeout(300000); // 5 minute timeout for large uploads

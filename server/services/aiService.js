@@ -4,6 +4,7 @@ dotenv.config();
 
 const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY,
+    timeout: 300000, // 5 minutes
 });
 
 const translateSegments = async (segments, target) => {
