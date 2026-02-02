@@ -403,6 +403,58 @@ app.post('/api/init-transcription', isAuthenticated, upload.single('audio'), asy
             console.log('Video detected, extracting raw audio...');
         }
 
+        // --- AUTO-COMPRESSION for large files ---
+        const fileSizeMB = req.file.size / (1024 * 1024);
+        const COMPRESSION_THRESHOLD_MB = 100;
+
+        if (fileSizeMB > COMPRESSION_THRESHOLD_MB) {
+            console.log(`File size: ${fileSizeMB.toFixed(2)}MB - Auto-compressing...`);
+            const compressedPath = path.join(userDir, `compressed_${uniqueFilename}`);
+
+            try {
+                await new Promise((resolve, reject) => {
+                    ffmpeg(filePath)
+                        .videoCodec('libx264')
+                        .videoBitrate('1000k')  // 1 Mbps video
+                        .outputOptions([
+                            '-crf 28',           // Quality setting
+                            '-preset medium',    // Encoding speed
+                            '-movflags +faststart'
+                        ])
+                        .audioCodec('aac')
+                        .audioBitrate('64k')     // Sufficient for speech
+                        .on('start', cmd => console.log('Compression command:', cmd))
+                        .on('progress', progress => {
+                            if (progress.percent) {
+                                console.log(`Compression progress: ${progress.percent.toFixed(1)}%`);
+                            }
+                        })
+                        .on('end', () => {
+                            const compressedSizeMB = fs.statSync(compressedPath).size / (1024 * 1024);
+                            const reduction = ((fileSizeMB - compressedSizeMB) / fileSizeMB) * 100;
+                            console.log(`Compression complete: ${fileSizeMB.toFixed(2)}MB → ${compressedSizeMB.toFixed(2)}MB (${reduction.toFixed(1)}% reduction)`);
+
+                            // Delete original, use compressed version
+                            fs.unlinkSync(filePath);
+                            fs.renameSync(compressedPath, filePath);
+                            resolve();
+                        })
+                        .on('error', (err) => {
+                            console.error('Compression failed:', err);
+                            // Continue with original file if compression fails
+                            if (fs.existsSync(compressedPath)) fs.unlinkSync(compressedPath);
+                            resolve();
+                        })
+                        .save(compressedPath);
+                });
+            } catch (err) {
+                console.error('Compression error:', err);
+                // Continue with original file
+            }
+        } else {
+            console.log(`File size: ${fileSizeMB.toFixed(2)}MB - No compression needed`);
+        }
+
         // --- 1. Audio Preprocessing (Mandatory) ---
         console.log('Preprocessing audio (MP3, 64k, Mono, Denoise, Loudnorm)...');
         const processedAudioPath = path.join(userDir, `processed_${path.basename(filePath, path.extname(filePath))}.mp3`);
